@@ -18,7 +18,20 @@ const messageSchema = new mongoose.Schema(
     image: {
         type: String,
     },
-    
+    // AI assistant replies only: the tools it used to answer
+    toolCalls: {
+        type: [
+            {
+                _id: false,
+                name: String,
+                label: String,
+                ok: Boolean,
+                resultCount: Number,
+            },
+        ],
+        default: undefined,
+    },
+
 }, { timestamps: true }
 );
 

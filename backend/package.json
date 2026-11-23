@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "test": "node --test \"src/**/*.test.js\""
+    "test": "node --test \"src/**/*.test.js\"",
+    "seed:demo": "node src/seeds/demo-chats.seed.js"
   },
   "keywords": [],
   "author": "",
