@@ -10,7 +10,8 @@ export const useChatStore = create((set, get) => ({
     selectedUser: null,
     isUsersLoading: false,
     isMessagesLoading: false,
-    // The AI assistant's reply while it is still streaming: { replyId, text }
+    // The AI assistant's reply while it is still streaming:
+    // { replyId, text, tools: [{ id, label, status, resultCount }] }
     aiReply: null,
 
 
@@ -68,13 +69,30 @@ export const useChatStore = create((set, get) => ({
 
         // Streaming reply from the AI assistant. The finished reply arrives as a
         // normal "newMessage" event just before "ai:done".
+        // Returns the in-progress reply for replyId, starting one if the chat was
+        // opened mid-reply.
+        const replyFor = (replyId) => {
+            const current = get().aiReply;
+            return current?.replyId === replyId ? current : { replyId, text: "", tools: [] };
+        };
+
         socket.on("ai:start", ({ replyId }) => {
-            set({ aiReply: { replyId, text: "" } });
+            set({ aiReply: { replyId, text: "", tools: [] } });
         });
         socket.on("ai:delta", ({ replyId, text }) => {
-            const current = get().aiReply;
-            const soFar = current?.replyId === replyId ? current.text : "";
-            set({ aiReply: { replyId, text: soFar + text } });
+            const reply = replyFor(replyId);
+            set({ aiReply: { ...reply, text: reply.text + text } });
+        });
+        // A failed stream was retried: replace the partial text.
+        socket.on("ai:reset", ({ replyId, text }) => {
+            set({ aiReply: { ...replyFor(replyId), text } });
+        });
+        socket.on("ai:tool", ({ replyId, id, label, status, resultCount }) => {
+            const reply = replyFor(replyId);
+            const step = { id, label, status, resultCount };
+            const exists = reply.tools.some((t) => t.id === id);
+            const tools = exists ? reply.tools.map((t) => (t.id === id ? step : t)) : [...reply.tools, step];
+            set({ aiReply: { ...reply, tools } });
         });
         socket.on("ai:done", ({ replyId }) => {
             if (get().aiReply?.replyId === replyId) set({ aiReply: null });
@@ -90,6 +108,8 @@ export const useChatStore = create((set, get) => ({
         socket.off("newMessage");
         socket.off("ai:start");
         socket.off("ai:delta");
+        socket.off("ai:reset");
+        socket.off("ai:tool");
         socket.off("ai:done");
         socket.off("ai:error");
         set({ aiReply: null });

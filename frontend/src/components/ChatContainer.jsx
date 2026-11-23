@@ -6,6 +6,7 @@ import MessageInput from './MessageInput';
 import MessageSkeleton from './skeletons/MessageSkeleton';
 import { useAuthStore } from '../store/useAuthStore';
 import { formatMessageTime } from '../lib/utils';
+import AiToolSteps from './AiToolSteps';
 
 
 const ChatContainer = () => {
@@ -79,6 +80,11 @@ const ChatContainer = () => {
                             )}
                             {message.text && <p className='whitespace-pre-wrap'>{message.text}</p>}
                         </div>
+                        {message.toolCalls?.some((call) => call.ok) && (
+                            <div className='chat-footer opacity-60 text-xs mt-1'>
+                                {message.toolCalls.filter((call) => call.ok).map((call) => call.label).join(" · ")}
+                            </div>
+                        )}
                 </div>
             ))}
 
@@ -91,6 +97,7 @@ const ChatContainer = () => {
                         </div>
                     </div>
                     <div className='chat-bubble flex flex-col'>
+                        <AiToolSteps steps={aiReply.tools} />
                         {aiReply.text
                             ? <p className='whitespace-pre-wrap'>{aiReply.text}</p>
                             : <span className='loading loading-dots loading-sm' aria-label='AI assistant is typing' />}
