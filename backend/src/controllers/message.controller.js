@@ -2,11 +2,15 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js"
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import { isAssistant, queueAssistantReply } from "../lib/ai.js";
 
 export const getUsersForSidebar = async(req, res) => {
     try {
         const loggedInUserId = req.user._id;
-        const fileteredUsers = await User.find({_id: {$ne:loggedInUserId}}).select("-password");
+        // The AI assistant is listed first.
+        const fileteredUsers = await User.find({_id: {$ne:loggedInUserId}})
+            .select("-password")
+            .sort({ isBot: -1, fullName: 1 });
 
         res.status(200).json(fileteredUsers)
     } catch (error) {
@@ -63,6 +67,11 @@ export const sendMessage = async(req, res) => {
         }
 
         res.status(201).json(newMessage);
+
+        // Messages to the AI assistant get a streamed reply over the socket.
+        if (isAssistant(receiverId)) {
+            queueAssistantReply(senderId);
+        }
 
     } catch (error) {
         console.log("Error in sendMessage controller: ", error.message);

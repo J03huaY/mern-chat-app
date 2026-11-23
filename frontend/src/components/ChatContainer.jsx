@@ -10,7 +10,7 @@ import { formatMessageTime } from '../lib/utils';
 
 const ChatContainer = () => {
   const {messages, getMessages, isMessagesLoading, selectedUser, subscribeToMessages,
-    unsubscribeFromMessages,
+    unsubscribeFromMessages, aiReply,
   } = useChatStore();
   const { authUser } = useAuthStore();  
   const messageEndRef = useRef(null);
@@ -27,7 +27,7 @@ const ChatContainer = () => {
     if (messageEndRef.current && messages) {
         messageEndRef.current.scrollIntoView({ behavior: "smooth"});
     }
-  },[messages]);
+  },[messages, aiReply]);
 
   if(isMessagesLoading) {return (
     <div className='flex-1 flex flex-col overflow-auto'>
@@ -77,10 +77,26 @@ const ChatContainer = () => {
                                 className="sm:max-w-[200px] rounded-md mb-2"
                                 />
                             )}
-                            {message.text && <p>{message.text}</p>}
+                            {message.text && <p className='whitespace-pre-wrap'>{message.text}</p>}
                         </div>
                 </div>
             ))}
+
+            {/* AI assistant reply that is still streaming in */}
+            {aiReply && (
+                <div className='chat chat-start' ref={messageEndRef}>
+                    <div className='chat-image avatar'>
+                        <div className='size-10 rounded-full border'>
+                            <img src={selectedUser.profilePic || "/avatar.png"} alt='AI assistant' />
+                        </div>
+                    </div>
+                    <div className='chat-bubble flex flex-col'>
+                        {aiReply.text
+                            ? <p className='whitespace-pre-wrap'>{aiReply.text}</p>
+                            : <span className='loading loading-dots loading-sm' aria-label='AI assistant is typing' />}
+                    </div>
+                </div>
+            )}
         </div>
       
         <MessageInput />

@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
+        // true only for the built-in AI assistant account
+        isBot: {
+            type: Boolean,
+            default: false,
+        },
     },
     {timestamps: true}
 );

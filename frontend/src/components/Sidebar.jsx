@@ -16,8 +16,11 @@ const Sidebar = () => {
     getUsers();
   }, [getUsers]);
 
+  // The AI assistant is always shown as online.
+  const isOnline = (user) => user.isBot || onlineUsers.includes(user._id);
+
   const filteredUsers = showOnlineOnly
-    ? users.filter((user) => onlineUsers.includes(user._id))
+    ? users.filter(isOnline)
     : users;
 
   if(isUsersLoading) return <SidebarSkeleton />
@@ -62,7 +65,7 @@ const Sidebar = () => {
                 alt={user.name}
                 className="size-12 object-cover rounded-full"
               />
-              {onlineUsers.includes(user._id) && (
+              {isOnline(user) && (
                 <span
                   className="absolute bottom-0 right-0 size-3 bg-green-500 
                   rounded-full ring-2 ring-zinc-900"
@@ -72,9 +75,12 @@ const Sidebar = () => {
 
             {/* User info - only visible on larger screens */}
             <div className="hidden lg:block text-left min-w-0">
-              <div className="font-medium truncate">{user.fullName}</div>
+              <div className="font-medium truncate flex items-center gap-2">
+                {user.fullName}
+                {user.isBot && <span className="badge badge-primary badge-sm">AI</span>}
+              </div>
               <div className="text-sm text-zinc-400">
-                {onlineUsers.includes(user._id) ? "Online" : "Offline"}
+                {user.isBot ? "Always online" : isOnline(user) ? "Online" : "Offline"}
               </div>
             </div>
           </button>
