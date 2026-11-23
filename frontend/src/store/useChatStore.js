@@ -10,6 +10,8 @@ export const useChatStore = create((set, get) => ({
     selectedUser: null,
     isUsersLoading: false,
     isMessagesLoading: false,
+    // The AI assistant's reply while it is still streaming: { replyId, text }
+    aiReply: null,
 
 
     getUsers: async () => {
@@ -61,11 +63,36 @@ export const useChatStore = create((set, get) => ({
                 messages: [...get().messages, newMessage],
             })
         })
+
+        if (!selectedUser.isBot) return;
+
+        // Streaming reply from the AI assistant. The finished reply arrives as a
+        // normal "newMessage" event just before "ai:done".
+        socket.on("ai:start", ({ replyId }) => {
+            set({ aiReply: { replyId, text: "" } });
+        });
+        socket.on("ai:delta", ({ replyId, text }) => {
+            const current = get().aiReply;
+            const soFar = current?.replyId === replyId ? current.text : "";
+            set({ aiReply: { replyId, text: soFar + text } });
+        });
+        socket.on("ai:done", ({ replyId }) => {
+            if (get().aiReply?.replyId === replyId) set({ aiReply: null });
+        });
+        socket.on("ai:error", ({ replyId, message }) => {
+            if (get().aiReply?.replyId === replyId) set({ aiReply: null });
+            toast.error(message);
+        });
     },
 
     unsubscribeFromMessages: () => {
         const socket = useAuthStore.getState().socket;
         socket.off("newMessage");
+        socket.off("ai:start");
+        socket.off("ai:delta");
+        socket.off("ai:done");
+        socket.off("ai:error");
+        set({ aiReply: null });
     },
 
     setSelectedUser: (selectedUser) => set({ selectedUser }),

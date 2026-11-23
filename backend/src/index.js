@@ -10,6 +10,7 @@ import { connectDB } from "./lib/db.js";
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import { app, server } from "./lib/socket.js";
+import { ensureAssistantUser } from "./lib/ai.js";
 
 dotenv.config()
 
@@ -39,4 +40,6 @@ if(process.env.NODE_ENV==="production"){
 server.listen(PORT, () => {
     console.log("server is running on PROT:" + PORT);
     connectDB()
+        .then(() => ensureAssistantUser())
+        .catch((error) => console.log("Could not set up the AI assistant user:", error.message));
 });
