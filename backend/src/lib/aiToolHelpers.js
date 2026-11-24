@@ -155,19 +155,26 @@ export function validateDraftInput(input) {
 }
 
 /**
- * Picks one contact from users whose names matched `name`.
- * An exact (case-insensitive) name match wins; otherwise exactly one
- * candidate is required. Returns { match } or { error }.
+ * Picks one contact from users whose names contain `name`.
+ * An exact (case-insensitive) name match wins. Otherwise names with a word
+ * that starts with `name` come first, so "Li" means "Bob Li", not "Alice".
+ * Returns { match } or { error }.
  */
 export function pickContact(candidates, name) {
     if (candidates.length === 0) {
         return { error: `No contact named "${name}" was found. Ask the user who they mean.` };
     }
-    const exact = candidates.filter((c) => c.fullName.toLowerCase() === name.toLowerCase());
+    const query = name.trim().toLowerCase();
+    const exact = candidates.filter((c) => c.fullName.toLowerCase() === query);
     if (exact.length === 1) return { match: exact[0] };
     if (candidates.length === 1) return { match: candidates[0] };
 
-    const names = candidates.map((c) => c.fullName).join(", ");
+    const wordStart = candidates.filter((c) =>
+        c.fullName.toLowerCase().split(/\s+/).some((word) => word.startsWith(query)),
+    );
+    if (wordStart.length === 1) return { match: wordStart[0] };
+
+    const names = (wordStart.length ? wordStart : candidates).map((c) => c.fullName).join(", ");
     return { error: `More than one contact matches "${name}": ${names}. Ask the user which one they mean.` };
 }
 

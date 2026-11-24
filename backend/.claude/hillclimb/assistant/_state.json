@@ -1,0 +1,59 @@
+{
+  "flow": "assistant",
+  "description": "AI assistant contact in the chat app: tool use and answer correctness on the demo chats.",
+  "metrics": [
+    {
+      "id": "pass",
+      "label": "Pass",
+      "kind": "binary"
+    },
+    {
+      "id": "tools",
+      "label": "Right actions",
+      "kind": "binary"
+    },
+    {
+      "id": "answer",
+      "label": "Right answer",
+      "kind": "binary"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "latency_s",
+      "label": "Latency",
+      "unit": "s"
+    },
+    {
+      "id": "tool_calls",
+      "label": "Tool calls"
+    },
+    {
+      "id": "steps",
+      "label": "Model calls"
+    },
+    {
+      "id": "in_tokens",
+      "label": "In tokens"
+    },
+    {
+      "id": "out_tokens",
+      "label": "Out tokens"
+    },
+    {
+      "id": "cost_usd",
+      "label": "Cost",
+      "unit": "$"
+    }
+  ],
+  "harness_paths": [
+    "evals/agent/grade.mjs",
+    "evals/agent/cases.json"
+  ],
+  "variants": [
+    {
+      "id": "baseline"
+    }
+  ],
+  "harness_sha": "4674f2c170dbb160b0b09018e5060a2801a490cce78746692b4c58d9d92aad32"
+}

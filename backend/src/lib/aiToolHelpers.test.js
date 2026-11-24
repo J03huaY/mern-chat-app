@@ -80,6 +80,22 @@ test("pickContact prefers an exact name and reports ambiguity", () => {
     assert.match(pickContact([], "Zed").error, /No contact named "Zed"/);
 });
 
+test("pickContact prefers a name with a word that starts with the query", () => {
+    const alice = { _id: "1", fullName: "Alice Chen" };
+    const bob = { _id: "2", fullName: "Bob Li" };
+    const lina = { _id: "3", fullName: "Lina Park" };
+
+    // "Alice" contains "li", but only "Bob Li" has a word starting with it.
+    assert.equal(pickContact([alice, bob], "Li").match, bob);
+    assert.equal(pickContact([alice, bob], "chen").match, alice);
+    // Two names start with "li": ask, and list only those two.
+    const ambiguous = pickContact([alice, bob, lina], "li");
+    assert.match(ambiguous.error, /Bob Li, Lina Park/);
+    assert.doesNotMatch(ambiguous.error, /Alice/);
+    // No word starts with the query: still ambiguous across every match.
+    assert.match(pickContact([alice, bob], "o").error, /Alice Chen, Bob Li/);
+});
+
 test("formatMessageLine names both sides and marks images", () => {
     const names = new Map([["a", "Alice"]]);
     const line = formatMessageLine(
