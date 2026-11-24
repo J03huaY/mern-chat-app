@@ -153,7 +153,7 @@ async function nameMap(messages) {
 }
 
 async function searchMessages(input, ctx) {
-    const { value, error } = validateSearchInput(input);
+    const { value, error } = validateSearchInput(input, ctx.timeZone);
     if (error) return { isError: true, content: error };
 
     const filters = [
@@ -183,7 +183,7 @@ async function searchMessages(input, ctx) {
     }
 
     const names = await nameMap(messages);
-    const lines = messages.map((m) => formatMessageLine(m, names, ctx.userId));
+    const lines = messages.map((m) => formatMessageLine(m, names, ctx.userId, ctx.timeZone));
     const more = messages.length === value.limit ? " There may be more; narrow the search to see others." : "";
     return {
         content: wrapChatData(
@@ -195,7 +195,7 @@ async function searchMessages(input, ctx) {
 }
 
 async function summarizeConversation(input, ctx) {
-    const { value, error } = validateConversationInput(input);
+    const { value, error } = validateConversationInput(input, ctx.timeZone);
     if (error) return { isError: true, content: error };
 
     const picked = pickContact(await findContacts(value.contact, ctx), value.contact);
@@ -214,8 +214,8 @@ async function summarizeConversation(input, ctx) {
 
     const messages = recent.reverse();
     const names = new Map([[String(contact._id), contact.fullName]]);
-    const lines = messages.map((m) => formatMessageLine(m, names, ctx.userId));
-    const span = `${formatTime(messages[0].createdAt)} to ${formatTime(messages[messages.length - 1].createdAt)}`;
+    const lines = messages.map((m) => formatMessageLine(m, names, ctx.userId, ctx.timeZone));
+    const span = `${formatTime(messages[0].createdAt, ctx.timeZone)} to ${formatTime(messages[messages.length - 1].createdAt, ctx.timeZone)}`;
     const shown = total > messages.length ? ` Showing the most recent ${messages.length} of ${total}.` : "";
     return {
         content: wrapChatData(
@@ -260,7 +260,7 @@ const EXECUTORS = {
 
 /**
  * Runs one tool for the signed-in user.
- * `ctx` is { userId, assistantId } and comes from the server, never from the model,
+ * `ctx` is { userId, assistantId, timeZone? } and comes from the server, never from the model,
  * so a tool can only ever read the requesting user's own messages.
  * Returns { content, isError?, resultCount?, draft? }.
  */

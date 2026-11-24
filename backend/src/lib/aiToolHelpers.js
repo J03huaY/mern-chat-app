@@ -13,20 +13,66 @@ export function escapeRegex(text) {
     return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** True when `timeZone` is an IANA time zone name this runtime knows, e.g. "America/Los_Angeles". */
+export function isValidTimeZone(timeZone) {
+    if (typeof timeZone !== "string" || !timeZone || timeZone.length > 64) return false;
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Calendar fields of `date` as seen in `timeZone` (undefined = the server's zone). */
+function zonedParts(date, timeZone) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        second: "numeric",
+    }).formatToParts(date);
+    const get = (type) => Number(parts.find((p) => p.type === type).value);
+    return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), second: get("second") };
+}
+
 /**
- * Parses a model-supplied date. "YYYY-MM-DD" is read as a whole local day:
- * the start of it, or the end of it when `endOfDay` is true. Full ISO
- * timestamps are used as given. Returns null for missing or invalid input.
+ * The instant at which the wall-clock time y-m-d h:mi:s.ms happens in `timeZone`.
+ * Works without a date library: start from the same fields read as UTC, then
+ * correct by the zone's offset (twice, so daylight-saving changes come out right).
  */
-export function parseDateInput(value, { endOfDay = false } = {}) {
+function zonedTimeToDate({ year, month, day, hour = 0, minute = 0, second = 0, ms = 0 }, timeZone) {
+    const asUtc = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+    let guess = asUtc;
+    for (let i = 0; i < 2; i++) {
+        const p = zonedParts(new Date(guess), timeZone);
+        const offset = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(guess / 1000) * 1000;
+        guess = asUtc - offset;
+    }
+    return new Date(guess);
+}
+
+/**
+ * Parses a model-supplied date. "YYYY-MM-DD" is read as a whole day in the
+ * user's time zone: the start of it, or the end of it when `endOfDay` is true.
+ * Full ISO timestamps are used as given. Returns null for missing or invalid input.
+ */
+export function parseDateInput(value, { endOfDay = false, timeZone } = {}) {
     if (value === undefined || value === null || value === "") return null;
     if (typeof value !== "string") return null;
 
     const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
     if (dateOnly) {
-        const [, y, m, d] = dateOnly.map(Number);
-        const date = endOfDay ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d);
-        return date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+        const [, year, month, day] = dateOnly.map(Number);
+        const check = new Date(Date.UTC(year, month - 1, day));
+        if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null; // e.g. Feb 30
+        return endOfDay
+            ? zonedTimeToDate({ year, month, day, hour: 23, minute: 59, second: 59, ms: 999 }, timeZone)
+            : zonedTimeToDate({ year, month, day }, timeZone);
     }
 
     const date = new Date(value);
@@ -40,9 +86,9 @@ function clampLimit(value, fallback, max) {
     return Math.min(n, max);
 }
 
-function readDateRange(input) {
-    const after = parseDateInput(input.after);
-    const before = parseDateInput(input.before, { endOfDay: true });
+function readDateRange(input, timeZone) {
+    const after = parseDateInput(input.after, { timeZone });
+    const before = parseDateInput(input.before, { endOfDay: true, timeZone });
     if (input.after && !after) return { error: `"after" is not a valid date: ${input.after}. Use YYYY-MM-DD.` };
     if (input.before && !before) return { error: `"before" is not a valid date: ${input.before}. Use YYYY-MM-DD.` };
     if (after && before && after > before) return { error: `"after" must be earlier than "before".` };
@@ -53,8 +99,8 @@ function optionalString(value) {
     return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-/** Validates search_messages input. Returns { value } or { error }. */
-export function validateSearchInput(input) {
+/** Validates search_messages input. Dates are read in `timeZone`. Returns { value } or { error }. */
+export function validateSearchInput(input, timeZone) {
     if (!input || typeof input !== "object") return { error: "Input must be an object." };
 
     const query = optionalString(input.query);
@@ -64,14 +110,14 @@ export function validateSearchInput(input) {
     const limit = clampLimit(input.limit, SEARCH_DEFAULT_LIMIT, SEARCH_MAX_LIMIT);
     if (limit === null) return { error: `"limit" must be a positive whole number.` };
 
-    const range = readDateRange(input);
+    const range = readDateRange(input, timeZone);
     if (range.error) return range;
 
     return { value: { query, contact: optionalString(input.contact), limit, ...range } };
 }
 
-/** Validates summarize_conversation input. Returns { value } or { error }. */
-export function validateConversationInput(input) {
+/** Validates summarize_conversation input. Dates are read in `timeZone`. Returns { value } or { error }. */
+export function validateConversationInput(input, timeZone) {
     if (!input || typeof input !== "object") return { error: "Input must be an object." };
 
     const contact = optionalString(input.contact);
@@ -80,7 +126,7 @@ export function validateConversationInput(input) {
     const limit = clampLimit(input.max_messages, CONVERSATION_DEFAULT_LIMIT, CONVERSATION_MAX_LIMIT);
     if (limit === null) return { error: `"max_messages" must be a positive whole number.` };
 
-    const range = readDateRange(input);
+    const range = readDateRange(input, timeZone);
     if (range.error) return range;
 
     return { value: { contact, limit, ...range } };
@@ -125,9 +171,11 @@ export function pickContact(candidates, name) {
     return { error: `More than one contact matches "${name}": ${names}. Ask the user which one they mean.` };
 }
 
-/** Formats a date as "YYYY-MM-DD HH:mm" in the server's time zone. */
-export function formatTime(date) {
-    return new Date(date).toLocaleString("sv-SE", { hour12: false }).slice(0, 16);
+/** Formats a date as "YYYY-MM-DD HH:mm" in `timeZone` (the server's zone when not given). */
+export function formatTime(date, timeZone) {
+    const p = zonedParts(new Date(date), timeZone);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}`;
 }
 
 function messageBody(message) {
@@ -140,11 +188,12 @@ function messageBody(message) {
 /**
  * One line per message: "[2026-11-23 12:16] Alice → you: text".
  * `names` maps user id strings to display names; the requesting user is "you".
+ * Times are shown in `timeZone`.
  */
-export function formatMessageLine(message, names, userId) {
+export function formatMessageLine(message, names, userId, timeZone) {
     const from = String(message.senderId) === String(userId) ? "you" : names.get(String(message.senderId)) || "someone";
     const to = String(message.receiverId) === String(userId) ? "you" : names.get(String(message.receiverId)) || "someone";
-    return `[${formatTime(message.createdAt)}] ${from} → ${to}: ${messageBody(message)}`;
+    return `[${formatTime(message.createdAt, timeZone)}] ${from} → ${to}: ${messageBody(message)}`;
 }
 
 /**

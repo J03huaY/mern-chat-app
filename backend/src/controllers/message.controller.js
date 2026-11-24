@@ -3,6 +3,7 @@ import Message from "../models/message.model.js"
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import { isAssistant, queueAssistantReply } from "../lib/ai.js";
+import { isValidTimeZone } from "../lib/aiToolHelpers.js";
 
 export const getUsersForSidebar = async(req, res) => {
     try {
@@ -70,7 +71,9 @@ export const sendMessage = async(req, res) => {
 
         // Messages to the AI assistant get a streamed reply over the socket.
         if (isAssistant(receiverId)) {
-            queueAssistantReply(senderId);
+            // The browser's time zone, if it sent a valid one; otherwise the server's.
+            const timeZone = isValidTimeZone(req.body.timeZone) ? req.body.timeZone : undefined;
+            queueAssistantReply(senderId, { timeZone });
         }
 
     } catch (error) {
