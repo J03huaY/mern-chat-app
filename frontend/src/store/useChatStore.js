@@ -43,7 +43,9 @@ export const useChatStore = create((set, get) => ({
     sendMessage: async (messageData) => {
         const {selectedUser, messages} = get();
         try {
-            const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, messageData);
+            // The AI assistant uses the browser's time zone to understand "yesterday", "tonight", etc.
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, { ...messageData, timeZone });
             set({messages:[...messages, res.data]})
         } catch (error) {
             toast.error(error.response.data.message);
