@@ -7,11 +7,12 @@ import MessageSkeleton from './skeletons/MessageSkeleton';
 import { useAuthStore } from '../store/useAuthStore';
 import { formatMessageTime } from '../lib/utils';
 import AiToolSteps from './AiToolSteps';
+import DraftCard from './DraftCard';
 
 
 const ChatContainer = () => {
   const {messages, getMessages, isMessagesLoading, selectedUser, subscribeToMessages,
-    unsubscribeFromMessages, aiReply,
+    unsubscribeFromMessages, aiReply, sendDraft, cancelDraft,
   } = useChatStore();
   const { authUser } = useAuthStore();  
   const messageEndRef = useRef(null);
@@ -79,6 +80,9 @@ const ChatContainer = () => {
                                 />
                             )}
                             {message.text && <p className='whitespace-pre-wrap'>{message.text}</p>}
+                            {message.drafts?.map((draft) => (
+                                <DraftCard key={draft._id} draft={draft} onSend={sendDraft} onCancel={cancelDraft} />
+                            ))}
                         </div>
                         {message.toolCalls?.some((call) => call.ok) && (
                             <div className='chat-footer opacity-60 text-xs mt-1'>
@@ -101,6 +105,9 @@ const ChatContainer = () => {
                         {aiReply.text
                             ? <p className='whitespace-pre-wrap'>{aiReply.text}</p>
                             : <span className='loading loading-dots loading-sm' aria-label='AI assistant is typing' />}
+                        {aiReply.drafts?.map((draft) => (
+                            <DraftCard key={draft._id} draft={draft} preview />
+                        ))}
                     </div>
                 </div>
             )}

@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+    MAX_DRAFT_CHARS,
+    checkDraftText,
+    validateDraftInput,
     CONVERSATION_MAX_LIMIT,
     SEARCH_DEFAULT_LIMIT,
     SEARCH_MAX_LIMIT,
@@ -93,6 +96,25 @@ test("formatMessageLine shortens very long messages", () => {
     );
     assert.ok(line.endsWith("…"));
     assert.ok(line.length < 560);
+});
+
+test("validateDraftInput requires a contact and message text", () => {
+    assert.ok(validateDraftInput({ text: "hi" }).error);
+    assert.ok(validateDraftInput({ contact: "Bob" }).error);
+    assert.ok(validateDraftInput({ contact: "Bob", text: "   " }).error);
+    assert.ok(validateDraftInput({ contact: "Bob", text: "x".repeat(MAX_DRAFT_CHARS + 1) }).error);
+    assert.deepEqual(validateDraftInput({ contact: " Bob ", text: " See you at 7! " }).value, {
+        contact: "Bob",
+        text: "See you at 7!",
+    });
+});
+
+test("checkDraftText accepts 1 to MAX_DRAFT_CHARS characters", () => {
+    assert.equal(checkDraftText("ok"), null);
+    assert.equal(checkDraftText("x".repeat(MAX_DRAFT_CHARS)), null);
+    assert.ok(checkDraftText(""));
+    assert.ok(checkDraftText(42));
+    assert.ok(checkDraftText("x".repeat(MAX_DRAFT_CHARS + 1)));
 });
 
 test("wrapChatData labels chat text as data", () => {

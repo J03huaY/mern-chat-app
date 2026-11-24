@@ -31,6 +31,24 @@ const messageSchema = new mongoose.Schema(
         ],
         default: undefined,
     },
+    // AI assistant replies only: messages it drafted for the user to send.
+    // Nothing is sent until the user presses Send (see sendDraft).
+    drafts: {
+        type: [
+            {
+                recipientId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+                recipientName: String,
+                text: { type: String, required: true },
+                status: {
+                    type: String,
+                    enum: ["pending", "sending", "sent", "cancelled"],
+                    default: "pending",
+                },
+                sentMessageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
+            },
+        ],
+        default: undefined,
+    },
 
 }, { timestamps: true }
 );

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildClaudeMessages } from "./aiMessages.js";
+import { buildClaudeMessages, describeDrafts } from "./aiMessages.js";
 
 const BOT = "bot1";
 const USER = "user1";
@@ -70,4 +70,35 @@ test("compares ObjectId-like ids by string value", () => {
 test("returns an empty list when there is no user message", () => {
     assert.deepEqual(buildClaudeMessages([{ senderId: BOT, text: "hi" }], BOT), []);
     assert.deepEqual(buildClaudeMessages([], BOT), []);
+});
+
+test("tells the model what happened to drafts in earlier replies", () => {
+    const result = buildClaudeMessages(
+        [
+            { senderId: USER, text: "reply to Bob" },
+            {
+                senderId: BOT,
+                text: "Here's a draft.",
+                drafts: [
+                    { recipientName: "Bob Li", text: "See you at 7!", status: "sent" },
+                    { recipientName: "Alice Chen", text: "Running late", status: "cancelled" },
+                ],
+            },
+            { senderId: USER, text: "did you send it?" },
+        ],
+        BOT,
+    );
+    assert.equal(
+        result[1].content,
+        'Here\'s a draft.\n[Draft to Bob Li: "See you at 7!" (the user sent it)]\n' +
+            '[Draft to Alice Chen: "Running late" (the user cancelled it)]',
+    );
+});
+
+test("describeDrafts marks pending drafts as waiting for the user", () => {
+    assert.equal(
+        describeDrafts([{ recipientName: "Bob Li", text: "hi", status: "pending" }]),
+        '[Draft to Bob Li: "hi" (waiting for the user to review and send it)]',
+    );
+    assert.equal(describeDrafts(undefined), "");
 });
