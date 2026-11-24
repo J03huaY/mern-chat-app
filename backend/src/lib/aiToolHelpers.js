@@ -86,6 +86,28 @@ export function validateConversationInput(input) {
     return { value: { contact, limit, ...range } };
 }
 
+export const MAX_DRAFT_CHARS = 2000;
+
+/** Checks message text for a draft. Returns an error string, or null when it's fine. */
+export function checkDraftText(text) {
+    if (typeof text !== "string" || !text.trim()) return "The message can't be empty.";
+    if (text.trim().length > MAX_DRAFT_CHARS) return `The message must be at most ${MAX_DRAFT_CHARS} characters.`;
+    return null;
+}
+
+/** Validates draft_message input. Returns { value } or { error }. */
+export function validateDraftInput(input) {
+    if (!input || typeof input !== "object") return { error: "Input must be an object." };
+
+    const contact = optionalString(input.contact);
+    if (!contact) return { error: `"contact" is required: the name of the person.` };
+
+    const textError = checkDraftText(input.text);
+    if (textError) return { error: `"text": ${textError}` };
+
+    return { value: { contact, text: input.text.trim() } };
+}
+
 /**
  * Picks one contact from users whose names matched `name`.
  * An exact (case-insensitive) name match wins; otherwise exactly one

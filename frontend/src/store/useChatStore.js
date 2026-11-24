@@ -50,6 +50,40 @@ export const useChatStore = create((set, get) => ({
         }
     },
 
+    // Replaces one message in the list (e.g. an AI reply whose draft changed status).
+    replaceMessage: (updated) => {
+        set({ messages: get().messages.map((m) => (m._id === updated._id ? updated : m)) });
+    },
+
+    // Sends a draft the AI assistant wrote. Returns true on success.
+    sendDraft: async (draftId, editedText) => {
+        try {
+            const res = await axiosInstance.post(`/messages/drafts/${draftId}/send`,
+                editedText !== undefined ? { text: editedText } : {});
+            get().replaceMessage(res.data.assistantMessage);
+            const draft = res.data.assistantMessage.drafts?.find((d) => d._id === draftId);
+            toast.success(`Sent to ${draft?.recipientName || "your contact"}`);
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't send the message.");
+            // The draft may have changed elsewhere (e.g. sent from another tab): reload it.
+            if (error.response?.status === 409 && get().selectedUser) get().getMessages(get().selectedUser._id);
+            return false;
+        }
+    },
+
+    cancelDraft: async (draftId) => {
+        try {
+            const res = await axiosInstance.post(`/messages/drafts/${draftId}/cancel`);
+            get().replaceMessage(res.data.assistantMessage);
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't cancel the draft.");
+            if (error.response?.status === 409 && get().selectedUser) get().getMessages(get().selectedUser._id);
+            return false;
+        }
+    },
+
     subscribeToMessages: () => {
         const { selectedUser }= get();
         if(!selectedUser) return;
@@ -73,11 +107,16 @@ export const useChatStore = create((set, get) => ({
         // opened mid-reply.
         const replyFor = (replyId) => {
             const current = get().aiReply;
-            return current?.replyId === replyId ? current : { replyId, text: "", tools: [] };
+            return current?.replyId === replyId ? current : { replyId, text: "", tools: [], drafts: [] };
         };
 
         socket.on("ai:start", ({ replyId }) => {
-            set({ aiReply: { replyId, text: "", tools: [] } });
+            set({ aiReply: { replyId, text: "", tools: [], drafts: [] } });
+        });
+        // A draft the assistant just wrote (shown as a preview until the reply is saved).
+        socket.on("ai:draft", ({ replyId, draft }) => {
+            const reply = replyFor(replyId);
+            set({ aiReply: { ...reply, drafts: [...reply.drafts, draft] } });
         });
         socket.on("ai:delta", ({ replyId, text }) => {
             const reply = replyFor(replyId);
@@ -110,6 +149,7 @@ export const useChatStore = create((set, get) => ({
         socket.off("ai:delta");
         socket.off("ai:reset");
         socket.off("ai:tool");
+        socket.off("ai:draft");
         socket.off("ai:done");
         socket.off("ai:error");
         set({ aiReply: null });
