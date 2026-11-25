@@ -40,6 +40,7 @@ export const useChatStore = create((set, get) => ({
         }
     },
 
+    // Returns true when the message was sent, so the input keeps its text on failure.
     sendMessage: async (messageData) => {
         const {selectedUser, messages} = get();
         try {
@@ -47,8 +48,10 @@ export const useChatStore = create((set, get) => ({
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, { ...messageData, timeZone });
             set({messages:[...messages, res.data]})
+            return true;
         } catch (error) {
-            toast.error(error.response.data.message);
+            toast.error(error.response?.data?.message || "Couldn't send the message. Please try again.");
+            return false;
         }
     },
 
