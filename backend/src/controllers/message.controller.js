@@ -26,12 +26,14 @@ export const getMessages = async(req, res) => {
         const {id:userToChatId} = req.params
         const myId = req.user._id;
 
+        // Sorted explicitly: without a sort, MongoDB returns whatever order the
+        // query plan produces (newest first, one sender at a time, with the indexes).
         const messages = await Message.find({
             $or: [
                 {senderId:myId, receiverId:userToChatId},
                 {senderId:userToChatId, receiverId:myId}
             ]
-        })
+        }).sort({ createdAt: 1, _id: 1 })
 
         res.status(200).json(messages);
     } catch (error) {

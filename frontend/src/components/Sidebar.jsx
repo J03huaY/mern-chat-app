@@ -9,7 +9,9 @@ const Sidebar = () => {
 
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
 
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers, authUser } = useAuthStore();
+  // Other people online (the list includes the signed-in user while connected).
+  const othersOnline = onlineUsers.filter((id) => id !== authUser?._id).length;
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ const Sidebar = () => {
             />
             <span className="text-sm">Show online only</span>
           </label>
-          <span className="text-xs text-zinc-500">({onlineUsers.length - 1} online)</span>
+          <span className="text-xs text-zinc-500">({othersOnline} online)</span>
         </div>
 
         </div>
