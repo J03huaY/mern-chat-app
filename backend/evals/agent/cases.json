@@ -583,6 +583,112 @@
         },
         "lang": "en"
       }
+    },
+    {
+      "id": "unclear-check-stale-task",
+      "category": "unclear",
+      "note": "Seen on the live site: after an old request and some small talk, '检查' made the assistant redo the old request.",
+      "history": [
+        {
+          "role": "user",
+          "text": "sum up my conversation with Bob",
+          "minutesAgo": 480
+        },
+        {
+          "role": "assistant",
+          "text": "You and Bob talked about the database homework (you only had the indexing question left) and planned ramen tomorrow at 7pm at the place on 5th.",
+          "minutesAgo": 480
+        },
+        {
+          "role": "user",
+          "text": "hello",
+          "minutesAgo": 180
+        },
+        {
+          "role": "assistant",
+          "text": "Hi! What can I do for you?",
+          "minutesAgo": 180
+        }
+      ],
+      "input": "检查",
+      "checks": {
+        "tools": {
+          "none": true
+        },
+        "drafts": {
+          "count": 0
+        },
+        "lang": "zh",
+        "judge": "The user's latest message '检查' (check) is unclear. The Bob summary was requested 8 hours ago and the conversation has moved on since. Pass if the reply asks briefly what the user wants to check (it may offer a few options). Fail if it re-does the Bob summary, looks something up, or drafts anything."
+      }
+    },
+    {
+      "id": "unclear-continue-stale-task",
+      "category": "unclear",
+      "history": [
+        {
+          "role": "user",
+          "text": "sum up my conversation with Bob",
+          "minutesAgo": 480
+        },
+        {
+          "role": "assistant",
+          "text": "You and Bob talked about the database homework (you only had the indexing question left) and planned ramen tomorrow at 7pm at the place on 5th.",
+          "minutesAgo": 480
+        },
+        {
+          "role": "user",
+          "text": "hello",
+          "minutesAgo": 180
+        },
+        {
+          "role": "assistant",
+          "text": "Hi! What can I do for you?",
+          "minutesAgo": 180
+        }
+      ],
+      "input": "continue",
+      "checks": {
+        "tools": {
+          "none": true
+        },
+        "drafts": {
+          "count": 0
+        },
+        "lang": "en",
+        "judge": "The user's latest message 'continue' is unclear: the last exchange was a greeting, and the Bob summary was 8 hours ago and already finished. Pass if the reply asks briefly what the user wants to continue. Fail if it acts on an old request or makes something up."
+      }
+    },
+    {
+      "id": "clear-yes-after-question",
+      "category": "unclear",
+      "history": [
+        {
+          "role": "user",
+          "text": "Bob 约我吃饭了吗？",
+          "minutesAgo": 2
+        },
+        {
+          "role": "assistant",
+          "text": "约了，他约你明晚 7 点在第五街的拉面店吃饭，你已经答应了。要我帮你给他发条消息确认一下吗？",
+          "minutesAgo": 2
+        }
+      ],
+      "input": "好",
+      "checks": {
+        "tools": {
+          "mustUse": [
+            "draft_message"
+          ]
+        },
+        "drafts": {
+          "count": 1,
+          "recipients": [
+            "Bob Li"
+          ]
+        },
+        "lang": "zh"
+      }
     }
   ]
 }

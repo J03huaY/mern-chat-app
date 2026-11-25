@@ -46,8 +46,11 @@ export const sendDraft = async (req, res) => {
         try {
             // 2. Deliver it exactly like a message the user typed.
             const sent = await Message.create({ senderId: userId, receiverId: draft.recipientId, text: draft.text });
-            const receiverSocketId = getReceiverSocketId(draft.recipientId);
-            if (receiverSocketId) io.to(receiverSocketId).emit("newMessage", sent);
+            // To the recipient, and to the user's tabs that have that chat open.
+            for (const id of [draft.recipientId, userId]) {
+                const socketId = getReceiverSocketId(id);
+                if (socketId) io.to(socketId).emit("newMessage", sent);
+            }
 
             // 3. Record the outcome on the assistant's reply.
             draft.status = "sent";

@@ -1,5 +1,6 @@
 // Turns stored chat messages into the `messages` array the Claude API expects.
 // Kept free of database and SDK imports so it can be unit-tested on its own.
+import { formatTime } from "./aiToolHelpers.js";
 
 const DRAFT_STATUS_TEXT = {
     pending: "waiting for the user to review and send it",
@@ -30,12 +31,16 @@ export function describeMemoryProposals(proposals) {
 }
 
 /**
- * @param {Array<{senderId: unknown, text?: string, image?: string, drafts?: Array, memoryProposals?: Array}>} history
+ * @param {Array<{senderId: unknown, text?: string, image?: string, createdAt?: Date, drafts?: Array, memoryProposals?: Array}>} history
  *   Messages between one user and the assistant, oldest first.
  * @param {string} assistantId The assistant user's id.
+ * @param {string} [timeZone] The user's time zone, for the times on their messages.
  * @returns {Array<{role: "user" | "assistant", content: string}>}
+ *
+ * Each user message starts with when it was sent ("[2026-11-24 18:22] ..."), so the
+ * model can tell a request from hours ago apart from the current one.
  */
-export function buildClaudeMessages(history, assistantId) {
+export function buildClaudeMessages(history, assistantId, timeZone) {
     const out = [];
 
     for (const message of history) {
@@ -53,6 +58,7 @@ export function buildClaudeMessages(history, assistantId) {
             text = [text, describeMemoryProposals(message.memoryProposals)].filter(Boolean).join("\n");
         }
         if (!text) continue;
+        if (role === "user" && message.createdAt) text = `[${formatTime(message.createdAt, timeZone)}] ${text}`;
 
         const last = out[out.length - 1];
         if (last && last.role === role) {

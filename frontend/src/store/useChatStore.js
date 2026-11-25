@@ -45,17 +45,25 @@ export const useChatStore = create((set, get) => ({
 
     // Returns true when the message was sent, so the input keeps its text on failure.
     sendMessage: async (messageData) => {
-        const {selectedUser, messages} = get();
+        const { selectedUser } = get();
         try {
             // The AI assistant uses the browser's time zone to understand "yesterday", "tonight", etc.
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, { ...messageData, timeZone });
-            set({messages:[...messages, res.data]})
+            get().addMessage(res.data);
             return true;
         } catch (error) {
             toast.error(error.response?.data?.message || "Couldn't send the message. Please try again.");
             return false;
         }
+    },
+
+    // Adds a message unless it's already shown: the sending tab gets its own message
+    // both from the send response and from the socket, in either order.
+    addMessage: (message) => {
+        const current = get().messages;
+        if (current.some((m) => m._id === message._id)) return;
+        set({ messages: [...current, message] });
     },
 
     // Replaces one message in the list (e.g. an AI reply whose draft changed status).
@@ -151,12 +159,13 @@ export const useChatStore = create((set, get) => ({
         const socket = useAuthStore.getState().socket;
 
         
+        // Messages in the open conversation, in either direction: from the other person,
+        // or from this user in another tab.
         socket.on("newMessage", (newMessage) => {
-            const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-            if (newMessage.senderId !== selectedUser._id) return;
-            set({
-                messages: [...get().messages, newMessage],
-            })
+            const myId = useAuthStore.getState().authUser?._id;
+            const fromThem = newMessage.senderId === selectedUser._id && newMessage.receiverId === myId;
+            const fromMe = newMessage.senderId === myId && newMessage.receiverId === selectedUser._id;
+            if (fromThem || fromMe) get().addMessage(newMessage);
         })
 
         if (!selectedUser.isBot) return;

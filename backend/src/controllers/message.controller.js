@@ -78,10 +78,11 @@ export const sendMessage = async(req, res) => {
 
         await newMessage.save();
 
-        // realtime functionality
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if(receiverSocketId) {
-            io.to(receiverSocketId).emit("newMessage", newMessage);
+        // realtime functionality: to the receiver, and to the sender's other open tabs
+        // (the tab that sent it already has it from this response and ignores the duplicate).
+        for (const userId of [receiverId, senderId]) {
+            const socketId = getReceiverSocketId(userId);
+            if (socketId) io.to(socketId).emit("newMessage", newMessage);
         }
 
         res.status(201).json(newMessage);
