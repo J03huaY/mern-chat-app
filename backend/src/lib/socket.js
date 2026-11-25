@@ -11,25 +11,45 @@ const io = new Server(server, {
   },
 });
 
+// A user can have several sockets at once: two tabs, or a reconnect that
+// overlaps the old connection (e.g. after a deploy). Each socket joins a room
+// named after its user, and events go to that room, so every open tab gets
+// them. A user counts as online while at least one of their sockets is open.
+const userSockets = new Map(); // userId -> Set of socket ids
+
+const roomFor = (userId) => `user:${userId}`;
+
+/**
+ * Where to send events for `userId`: their room while they have a socket open,
+ * else undefined. Use as `io.to(getReceiverSocketId(id)).emit(...)`.
+ */
 export function getReceiverSocketId(userId) {
-    return userSocketMap[userId];
+    const key = String(userId);
+    return userSockets.get(key)?.size ? roomFor(key) : undefined;
 }
 
-const userSocketMap = {}; //{userId: socketId}
+export const getOnlineUserIds = () => [...userSockets.keys()];
 
 io.on("connection", (socket) => {
-    console.log("A user connected", socket.id);
+    const userId = socket.handshake.query.userId ? String(socket.handshake.query.userId) : null;
 
-    const userId = socket.handshake.query.userId
-    if(userId) userSocketMap[userId] = socket.id
+    if (userId) {
+        socket.join(roomFor(userId));
+        if (!userSockets.has(userId)) userSockets.set(userId, new Set());
+        userSockets.get(userId).add(socket.id);
+    }
 
-    // io.emit() is used to send events to all the connected clients
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    // io.emit() sends to every connected client.
+    io.emit("getOnlineUsers", getOnlineUserIds());
 
     socket.on("disconnect", () => {
-        console.log("A user disconnected", socket.id);
-        delete userSocketMap[userId];
-        io.emit("getOnlineUsers", Object.keys(userSocketMap));
+        // Remove only this socket; the user stays online while another one is open.
+        const sockets = userId && userSockets.get(userId);
+        if (sockets) {
+            sockets.delete(socket.id);
+            if (sockets.size === 0) userSockets.delete(userId);
+        }
+        io.emit("getOnlineUsers", getOnlineUserIds());
     });
 });
 
