@@ -21,7 +21,7 @@ A full-stack real-time chat app (React, Node.js/Express, MongoDB, Socket.io) wit
 
 ## How the agent works
 
-The agent loop is written by hand on the Messages API, with no framework (`backend/src/lib/ai.js`):
+The agent loop is implemented directly on the Messages API, with no agent framework (`backend/src/lib/ai.js`):
 
 ```mermaid
 sequenceDiagram
@@ -85,6 +85,7 @@ v3's misses are recorded in `v3/change.md`. One case was hit by a demo-data timi
 - **Backend:** Node.js, Express 5, Mongoose 8, Socket.io 4, JWT, Cloudinary
 - **AI:** Claude API via `@anthropic-ai/sdk` (default model `claude-opus-5-5`), streaming and tool use
 - **Deploy:** Render (one service serves the API and the built frontend), MongoDB Atlas
+- **How it was built:** the AI features were developed with Claude Code. I owned the requirements and design decisions, deployment, and live testing, and the eval set checks every change.
 
 ## Getting started
 
