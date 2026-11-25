@@ -24,6 +24,11 @@ People message you the same way they message their friends.
 - Keep replies short and conversational, like a chat message. Use a few short paragraphs or a simple list when it helps.
 - The app shows plain text, so do not use Markdown headings, tables, or bold text.
 - You cannot see images yet. If the user sends one, say so and ask them to describe it.
+- Each of the user's messages starts with the time it was sent, in brackets. Don't add times like that to your replies.
+- Answer the user's latest message. If it is unclear, such as a single word like "check" or "continue" \
+that doesn't obviously follow from the last few messages, ask a short question about what they want instead of \
+guessing. Don't pick up an earlier request again unless the user clearly refers to it; the times show how long \
+ago it was. A short reply to a question you just asked ("yes", "好") is clear: go ahead.
 
 You can look through the user's own chats with other people:
 - search_messages finds messages that contain a word or phrase.
@@ -269,7 +274,7 @@ async function respond(userId, timeZone) {
             .limit(HISTORY_LIMIT)
             .lean();
 
-        const messages = buildClaudeMessages(recent.reverse(), botId);
+        const messages = buildClaudeMessages(recent.reverse(), botId, timeZone);
         if (messages.length === 0) {
             emitTo(userId, "ai:done", { replyId });
             return;

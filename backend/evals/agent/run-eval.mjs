@@ -246,14 +246,15 @@ async function runCase(c, ctx) {
   ctx.model ??= process.env.AI_MODEL || 'claude-opus-5-5'; // so the served-model check always runs
 
   // The case's conversation with the assistant, as stored messages, oldest first.
+  // History turns are a minute apart unless a turn sets `minutesAgo`.
   const t = Date.now() - 60_000 * ((c.history?.length ?? 0) + 1);
-  const docs = [...(c.history ?? []), { role: 'user', text: c.input }].map((turn, i) => ({
+  const docs = [...(c.history ?? []), { role: 'user', text: c.input, minutesAgo: 0 }].map((turn, i) => ({
     senderId: turn.role === 'user' ? env.userId : env.botId,
     receiverId: turn.role === 'user' ? env.botId : env.userId,
     text: turn.text,
-    createdAt: new Date(t + i * 60_000),
+    createdAt: turn.minutesAgo !== undefined ? new Date(Date.now() - turn.minutesAgo * 60_000) : new Date(t + i * 60_000),
   }));
-  const messages = env.buildClaudeMessages(docs, env.botId);
+  const messages = env.buildClaudeMessages(docs, env.botId, EVAL_TZ);
 
   // Memories the user already saved, for cases that test recall and updates.
   const memories = (c.memories ?? []).map((m) => ({

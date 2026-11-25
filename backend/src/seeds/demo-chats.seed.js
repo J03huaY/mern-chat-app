@@ -56,6 +56,32 @@ function at(daysAgo, time) {
     return date;
 }
 
+/**
+ * Today's demo messages have fixed clock times (09:30...), which are still in the
+ * future when the seed runs early in the morning. Then "today" includes messages
+ * that haven't been sent yet, and answers depend on what time the seed ran.
+ * If the last of them would be in the future, move all of today's messages
+ * earlier by the same amount, ending a few minutes ago, but never before midnight.
+ */
+function keepTodayInThePast(dates, daysAgoList, now = new Date()) {
+    const todayIdx = daysAgoList.map((d, i) => (d === 0 ? i : -1)).filter((i) => i >= 0);
+    if (todayIdx.length === 0) return dates;
+    const latest = Math.max(...todayIdx.map((i) => dates[i].getTime()));
+    const target = now.getTime() - 5 * 60_000;
+    if (latest <= target) return dates;
+
+    const midnight = new Date(now);
+    midnight.setHours(0, 0, 0, 0);
+    const shift = latest - target;
+    const out = [...dates];
+    todayIdx.forEach((i, k) => {
+        const moved = dates[i].getTime() - shift;
+        // Keep them on today and in order, a minute apart at least.
+        out[i] = new Date(Math.max(moved, midnight.getTime() + (k + 1) * 60_000));
+    });
+    return out;
+}
+
 async function seed() {
     const email = process.env.TEST_USER_EMAIL;
     if (!email) throw new Error("Set TEST_USER_EMAIL (in .env.test.local) to the account to seed chats for.");
@@ -83,9 +109,13 @@ async function seed() {
     });
 
     // Insert through the driver so the createdAt values above are kept.
-    const docs = DEMO_MESSAGES.map(([contactEmail, fromContact, daysAgo, time, text]) => {
+    const createdAts = keepTodayInThePast(
+        DEMO_MESSAGES.map(([, , daysAgo, time]) => at(daysAgo, time)),
+        DEMO_MESSAGES.map(([, , daysAgo]) => daysAgo),
+    );
+    const docs = DEMO_MESSAGES.map(([contactEmail, fromContact, daysAgo, time, text], i) => {
         const contactId = contacts.get(contactEmail);
-        const createdAt = at(daysAgo, time);
+        const createdAt = createdAts[i];
         return {
             senderId: fromContact ? contactId : user._id,
             receiverId: fromContact ? user._id : contactId,

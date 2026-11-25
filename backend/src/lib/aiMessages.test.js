@@ -119,3 +119,21 @@ test("buildClaudeMessages tells the model what happened to its memory suggestion
     assert.match(messages[1].content, /\[Memory suggestion: "Looking for backend jobs\." \(the user saved it\)\]/);
     assert.match(messages[1].content, /"Likes ramen\." \(the user dismissed it\)/);
 });
+
+test("buildClaudeMessages starts each user message with when it was sent, in the user's time zone", () => {
+    const messages = buildClaudeMessages(
+        [
+            { senderId: "u", text: "sum up my chat with Josh", createdAt: new Date("2026-11-25T02:22:00Z") },
+            { senderId: "bot", text: "He hasn't replied yet.", createdAt: new Date("2026-11-25T02:22:05Z") },
+            { senderId: "u", text: "检查", createdAt: new Date("2026-11-25T10:48:00Z") },
+            { senderId: "u", text: "?", createdAt: new Date("2026-11-25T10:48:30Z") },
+        ],
+        "bot",
+        "America/Los_Angeles",
+    );
+    assert.equal(messages[0].content, "[2026-11-24 18:22] sum up my chat with Josh");
+    // Assistant turns get no time, so the model doesn't learn to write one.
+    assert.equal(messages[1].content, "He hasn't replied yet.");
+    // Merged user messages keep a time each.
+    assert.equal(messages[2].content, "[2026-11-25 02:48] 检查\n\n[2026-11-25 02:48] ?");
+});
