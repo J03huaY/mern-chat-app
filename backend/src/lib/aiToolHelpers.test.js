@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import {
     formatTime,
     isValidTimeZone,
+    MAX_MEMORY_CHARS,
+    checkMemoryText,
+    formatMemories,
+    validateMemoryInput,
     MAX_DRAFT_CHARS,
     checkDraftText,
     validateDraftInput,
@@ -195,4 +199,31 @@ test("formatMessageLine uses the given time zone", () => {
         "Asia/Shanghai",
     );
     assert.equal(line, "[2026-11-22 18:00] Alice → you: hi");
+});
+
+test("checkMemoryText accepts short facts and refuses secrets", () => {
+    assert.equal(checkMemoryText("Is looking for backend new grad jobs."), null);
+    assert.equal(checkMemoryText("x".repeat(MAX_MEMORY_CHARS)), null);
+    assert.ok(checkMemoryText(""));
+    assert.ok(checkMemoryText("x".repeat(MAX_MEMORY_CHARS + 1)));
+    assert.match(checkMemoryText("My password is hunter2"), /secrets/);
+    assert.match(checkMemoryText("我的密码是 1234"), /secrets/);
+    assert.match(checkMemoryText("API key: abc"), /secrets/);
+});
+
+test("validateMemoryInput only lets `replaces` point at one of the user's memories", () => {
+    const memories = [{ _id: "m1", text: "Looking for backend jobs." }];
+    assert.deepEqual(validateMemoryInput({ text: " Prefers Python. " }, memories).value, { text: "Prefers Python.", replaces: null });
+    assert.deepEqual(validateMemoryInput({ text: "Looking for frontend jobs.", replaces: "m1" }, memories).value, {
+        text: "Looking for frontend jobs.",
+        replaces: memories[0],
+    });
+    assert.match(validateMemoryInput({ text: "x", replaces: "someone-elses" }, memories).error, /replaces/);
+    assert.ok(validateMemoryInput({}, memories).error);
+});
+
+test("formatMemories lists each memory with its id and date", () => {
+    assert.match(formatMemories([]), /no saved memories/);
+    const out = formatMemories([{ _id: "m1", text: "Name is Josh.", createdAt: new Date("2026-11-20T10:00:00Z") }], "UTC");
+    assert.match(out, /- \[m1\] Name is Josh\. \(saved 2026-11-20\)/);
 });

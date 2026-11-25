@@ -8,11 +8,12 @@ import { useAuthStore } from '../store/useAuthStore';
 import { formatMessageTime } from '../lib/utils';
 import AiToolSteps from './AiToolSteps';
 import DraftCard from './DraftCard';
+import MemoryCard from './MemoryCard';
 
 
 const ChatContainer = () => {
   const {messages, getMessages, isMessagesLoading, selectedUser, subscribeToMessages,
-    unsubscribeFromMessages, aiReply, sendDraft, cancelDraft,
+    unsubscribeFromMessages, aiReply, sendDraft, cancelDraft, saveMemory, dismissMemory,
   } = useChatStore();
   const { authUser } = useAuthStore();  
   const messageEndRef = useRef(null);
@@ -83,6 +84,9 @@ const ChatContainer = () => {
                             {message.drafts?.map((draft) => (
                                 <DraftCard key={draft._id} draft={draft} onSend={sendDraft} onCancel={cancelDraft} />
                             ))}
+                            {message.memoryProposals?.map((proposal) => (
+                                <MemoryCard key={proposal._id} proposal={proposal} onSave={saveMemory} onDismiss={dismissMemory} />
+                            ))}
                         </div>
                         {message.toolCalls?.some((call) => call.ok) && (
                             <div className='chat-footer opacity-60 text-xs mt-1'>
@@ -107,6 +111,9 @@ const ChatContainer = () => {
                             : <span className='loading loading-dots loading-sm' aria-label='AI assistant is typing' />}
                         {aiReply.drafts?.map((draft) => (
                             <DraftCard key={draft._id} draft={draft} preview />
+                        ))}
+                        {aiReply.memories?.map((proposal) => (
+                            <MemoryCard key={proposal._id} proposal={proposal} preview />
                         ))}
                     </div>
                 </div>

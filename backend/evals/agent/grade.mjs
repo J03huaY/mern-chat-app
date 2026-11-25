@@ -23,7 +23,8 @@ export function fillDates(value, dates) {
 
 /**
  * Runs the code checks. `run` is { text, toolCalls: [{name, ok}], toolInputs: [{name, input, ok}],
- * drafts: [{recipientName, text}] }. Returns a list of { metric, check, ok, detail }.
+ * drafts: [{recipientName, text}], memoryProposals?: [{text, replaces}] }.
+ * Returns a list of { metric, check, ok, detail }.
  */
 export function codeChecks(checks, run, dates) {
     const out = [];
@@ -58,6 +59,21 @@ export function codeChecks(checks, run, dates) {
             const got = run.drafts.map((d) => d.recipientName).sort();
             add("tools", "drafts.recipients", JSON.stringify(got) === JSON.stringify([...recipients].sort()),
                 `wanted ${recipients.join(", ")}; got ${got.join(", ") || "none"}`);
+        }
+    }
+
+    if (checks.memories) {
+        const proposals = run.memoryProposals || [];
+        const { count, textContains, replaces } = checks.memories;
+        add("tools", "memories.count", proposals.length === count,
+            `wanted ${count}, got ${proposals.length}${proposals.length ? `: ${JSON.stringify(proposals.map((p) => p.text))}` : ""}`);
+        for (const group of textContains || []) {
+            add("tools", "memories.text", proposals.some((p) => group.some((alt) => p.text.toLowerCase().includes(alt.toLowerCase()))),
+                `a suggestion containing one of ${JSON.stringify(group)}`);
+        }
+        if (replaces) {
+            add("tools", "memories.replaces", proposals.some((p) => String(p.replaces) === replaces),
+                `should replace memory ${replaces}; got ${JSON.stringify(proposals.map((p) => p.replaces ?? null))}`);
         }
     }
 
@@ -100,6 +116,7 @@ export async function judge(client, { rubric, history = [], input, run }) {
         `User: ${input}`,
         `Tools the assistant called: ${run.toolInputs.length ? run.toolInputs.map((c) => `${c.name}(${JSON.stringify(c.input)})${c.ok ? "" : " [failed]"}`).join("; ") : "none"}`,
         `Drafts it created (not sent): ${run.drafts.length ? run.drafts.map((d) => `to ${d.recipientName}: ${JSON.stringify(d.text)}`).join("; ") : "none"}`,
+        `Memory suggestions it made (not saved until the user presses Save): ${run.memoryProposals?.length ? run.memoryProposals.map((p) => JSON.stringify(p.text)).join("; ") : "none"}`,
         `Assistant's final reply: ${run.text}`,
     ];
     const response = await client.messages.create({

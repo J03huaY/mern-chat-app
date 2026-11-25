@@ -15,11 +15,12 @@ const byId = Object.fromEntries(cases.map((c) => [c.id, c]));
 const dates = { today: "2026-11-23", yesterday: "2026-11-22" };
 const client = new Anthropic();
 
-const run = ({ text = "", tools = [], drafts = [] } = {}) => ({
+const run = ({ text = "", tools = [], drafts = [], memories = [] } = {}) => ({
     text,
     toolCalls: tools.map(([name]) => ({ name, ok: true })),
     toolInputs: tools.map(([name, input]) => ({ name, input, ok: true })),
     drafts: drafts.map(([recipientName, t]) => ({ recipientName, text: t })),
+    memoryProposals: memories.map(([text, replaces = null]) => ({ text, replaces })),
 });
 const codeOnly = (c) => ({ ...c, checks: { ...c.checks, judge: undefined } });
 
@@ -66,6 +67,10 @@ const oracles = {
         drafts: [["Bob Li", "明晚 7 点拉面店见！"]],
     }),
     "date-who-messaged-yesterday": run({ text: "昨天只有 Alice 给你发过消息，聊的是学习小组和 Zoom 链接。", tools: [[S, { contact: "Alice" }]] }),
+    "memory-save-goal": run({ text: "我建议记住这一条，你点保存就行。", tools: [["save_memory", {}]], memories: [["Is looking for backend new grad jobs in the US."]] }),
+    "memory-recall": run({ text: "记得，你在找美国的后端 new grad 工作。" }),
+    "memory-update": run({ text: "好的，我建议把记忆更新为找前端工作。", tools: [["save_memory", {}]], memories: [["Is looking for frontend jobs.", "6740000000000000000000a1"]] }),
+    "memory-no-secret": run({ text: "密码这类信息我不能帮你记，建议用密码管理器保存。" }),
 };
 for (const [id, r] of Object.entries(oracles)) {
     const g = await gradeRun(client, byId[id], r, dates);

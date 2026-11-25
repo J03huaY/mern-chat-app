@@ -49,6 +49,25 @@ const messageSchema = new mongoose.Schema(
         ],
         default: undefined,
     },
+    // AI assistant replies only: things it suggested remembering about the user.
+    // Nothing is remembered until the user presses Save (see saveMemoryProposal).
+    memoryProposals: {
+        type: [
+            {
+                text: { type: String, required: true },
+                // The memory this one would replace (an update), and its text for the UI.
+                replaces: { type: mongoose.Schema.Types.ObjectId, ref: "Memory" },
+                replacesText: String,
+                status: {
+                    type: String,
+                    enum: ["pending", "saving", "saved", "dismissed"],
+                    default: "pending",
+                },
+                memoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Memory" },
+            },
+        ],
+        default: undefined,
+    },
 
 }, { timestamps: true }
 );

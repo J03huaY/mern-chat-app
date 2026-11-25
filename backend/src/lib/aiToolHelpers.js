@@ -216,3 +216,47 @@ export function wrapChatData(header, lines) {
         "</chat_data>",
     ].join("\n");
 }
+
+export const MAX_MEMORY_CHARS = 300;
+export const MAX_MEMORIES = 50;
+
+// Defense in depth: the tool description already says never to save secrets.
+const SECRET_PATTERN = /password|passcode|密码|口令|api[ _-]?key|secret key|access token|信用卡|credit card|card number|social security|身份证号|银行卡号/i;
+
+/** Checks the text of a memory. Returns an error string, or null when it's fine. */
+export function checkMemoryText(text) {
+    if (typeof text !== "string" || !text.trim()) return "The memory can't be empty.";
+    if (text.trim().length > MAX_MEMORY_CHARS) return `A memory must be at most ${MAX_MEMORY_CHARS} characters.`;
+    if (SECRET_PATTERN.test(text)) return "Memories can't hold passwords, keys or other secrets.";
+    return null;
+}
+
+/**
+ * Validates save_memory input. `memories` are the user's saved memories ({ _id, text });
+ * `replaces`, when given, must be one of their ids. Returns { value } or { error }.
+ */
+export function validateMemoryInput(input, memories = []) {
+    if (!input || typeof input !== "object") return { error: "Input must be an object." };
+
+    const textError = checkMemoryText(input.text);
+    if (textError) return { error: `"text": ${textError}` };
+
+    let replaces = null;
+    if (input.replaces !== undefined && input.replaces !== null && input.replaces !== "") {
+        replaces = memories.find((m) => String(m._id) === String(input.replaces).trim()) || null;
+        if (!replaces) return { error: `"replaces" must be the id of one of the memories listed in your instructions.` };
+    }
+
+    return { value: { text: input.text.trim(), replaces } };
+}
+
+/** The system-prompt section listing what the assistant remembers about the user. */
+export function formatMemories(memories, timeZone) {
+    if (!memories?.length) return "You have no saved memories about the user yet.";
+    const lines = memories.map((m) => `- [${m._id}] ${m.text} (saved ${formatTime(m.createdAt, timeZone).slice(0, 10)})`);
+    return [
+        "What you remember about the user. The user saved each of these; they may be out of date. " +
+            "Use them when they help, without reciting them unprompted.",
+        ...lines,
+    ].join("\n");
+}
