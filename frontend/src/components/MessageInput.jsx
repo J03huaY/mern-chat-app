@@ -35,11 +35,12 @@ const MessageInput = () => {
         if (!text.trim() && !imagePreview) return;
 
         try {
-            await sendMessage({
+            const sent = await sendMessage({
               text: text.trim(),
               image: imagePreview,
             });
-      
+            if (!sent) return; // keep what the user typed so they can retry
+
             // Clear form
             setText("");
             setImagePreview(null);

@@ -102,3 +102,20 @@ test("describeDrafts marks pending drafts as waiting for the user", () => {
     );
     assert.equal(describeDrafts(undefined), "");
 });
+
+test("buildClaudeMessages tells the model what happened to its memory suggestions", () => {
+    const messages = buildClaudeMessages(
+        [
+            { senderId: "u", text: "I'm job hunting for backend roles" },
+            {
+                senderId: "bot",
+                text: "Good luck! Want me to remember that?",
+                memoryProposals: [{ text: "Looking for backend jobs.", status: "saved" }, { text: "Likes ramen.", status: "dismissed" }],
+            },
+            { senderId: "u", text: "thanks" },
+        ],
+        "bot",
+    );
+    assert.match(messages[1].content, /\[Memory suggestion: "Looking for backend jobs\." \(the user saved it\)\]/);
+    assert.match(messages[1].content, /"Likes ramen\." \(the user dismissed it\)/);
+});

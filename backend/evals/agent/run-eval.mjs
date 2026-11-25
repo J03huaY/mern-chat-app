@@ -231,6 +231,9 @@ function toTranscript(c, run) {
   if (run.drafts.length) {
     turns.push({ role: 'assistant', content: `[UI] Draft cards shown:\n${run.drafts.map((d) => `to ${d.recipientName}: ${d.text}`).join('\n')}` });
   }
+  if (run.memoryProposals?.length) {
+    turns.push({ role: 'assistant', content: `[UI] Memory suggestions shown:\n${run.memoryProposals.map((p) => p.text + (p.replaces ? ` (replaces ${p.replaces})` : '')).join('\n')}` });
+  }
   turns.push({ role: 'assistant', content: `[Final reply saved to the chat]\n${run.text}` });
   return turns;
 }
@@ -252,7 +255,12 @@ async function runCase(c, ctx) {
   }));
   const messages = env.buildClaudeMessages(docs, env.botId);
 
-  const result = await env.runAgent(messages, { userId: env.userId, assistantId: env.botId, timeZone: EVAL_TZ });
+  // Memories the user already saved, for cases that test recall and updates.
+  const memories = (c.memories ?? []).map((m) => ({
+    _id: m.id, text: m.text, createdAt: new Date(Date.now() - (m.savedDaysAgo ?? 3) * 86_400_000),
+  }));
+
+  const result = await env.runAgent(messages, { userId: env.userId, assistantId: env.botId, timeZone: EVAL_TZ, memories });
 
   // Every step must come from the requested model; report the first one that didn't.
   const models = result.steps.map((s) => s.message.model);
@@ -264,6 +272,7 @@ async function runCase(c, ctx) {
     toolCalls: result.toolCalls,
     toolInputs: result.steps.flatMap((s) => s.results),
     drafts: result.drafts,
+    memoryProposals: result.memoryProposals,
     model: odd ?? models[0],
     usage: sumUsage(result.steps),
     stop_reason: last?.stop_reason,

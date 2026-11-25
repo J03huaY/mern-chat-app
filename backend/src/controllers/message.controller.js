@@ -4,6 +4,7 @@ import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import { isAssistant, queueAssistantReply } from "../lib/ai.js";
 import { isValidTimeZone } from "../lib/aiToolHelpers.js";
+import { assistantUsage, checkAssistantLimits, checkAssistantMessageText, readLimits } from "../lib/aiRateLimit.js";
 
 export const getUsersForSidebar = async(req, res) => {
     try {
@@ -44,6 +45,20 @@ export const sendMessage = async(req, res) => {
         const { text, image} = req.body;
         const { id: receiverId } = req.params;
         const senderId = req.user._id;
+
+        // Every message to the AI assistant costs an API call, so cap length and rate
+        // before uploading or saving anything.
+        if (isAssistant(receiverId)) {
+            const tooLong = checkAssistantMessageText(text);
+            if (tooLong) return res.status(400).json({ message: tooLong });
+
+            const limited = checkAssistantLimits(await assistantUsage(senderId, receiverId), readLimits());
+            if (limited) {
+                console.log(`AI assistant limit reached for user ${senderId}: ${limited.error}`);
+                res.set("Retry-After", String(limited.retryAfterSeconds));
+                return res.status(429).json({ message: limited.error });
+            }
+        }
 
         let imageUrl;
         if (image) {

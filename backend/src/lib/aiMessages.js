@@ -15,8 +15,22 @@ export function describeDrafts(drafts) {
         .join("\n");
 }
 
+const MEMORY_STATUS_TEXT = {
+    pending: "waiting for the user to save or dismiss it",
+    saving: "waiting for the user to save or dismiss it",
+    saved: "the user saved it",
+    dismissed: "the user dismissed it",
+};
+
+/** One line per memory suggestion, so the model knows which ones the user saved. */
+export function describeMemoryProposals(proposals) {
+    return (proposals || [])
+        .map((p) => `[Memory suggestion: "${p.text}" (${MEMORY_STATUS_TEXT[p.status] || p.status})]`)
+        .join("\n");
+}
+
 /**
- * @param {Array<{senderId: unknown, text?: string, image?: string, drafts?: Array}>} history
+ * @param {Array<{senderId: unknown, text?: string, image?: string, drafts?: Array, memoryProposals?: Array}>} history
  *   Messages between one user and the assistant, oldest first.
  * @param {string} assistantId The assistant user's id.
  * @returns {Array<{role: "user" | "assistant", content: string}>}
@@ -34,6 +48,9 @@ export function buildClaudeMessages(history, assistantId) {
         }
         if (role === "assistant" && message.drafts?.length) {
             text = [text, describeDrafts(message.drafts)].filter(Boolean).join("\n");
+        }
+        if (role === "assistant" && message.memoryProposals?.length) {
+            text = [text, describeMemoryProposals(message.memoryProposals)].filter(Boolean).join("\n");
         }
         if (!text) continue;
 

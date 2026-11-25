@@ -1,10 +1,13 @@
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Brain, X } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import MemoryPanel from "./MemoryPanel";
 
 const ChatHeader = () => {
   const { selectedUser, setSelectedUser } = useChatStore();
   const { onlineUsers } = useAuthStore();
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
 
   return (
     <div className="p-2.5 border-b border-base-300">
@@ -28,11 +31,20 @@ const ChatHeader = () => {
           </div>
         </div>
 
-        {/* Close button */}
-        <button onClick={() => setSelectedUser(null)}>
-          <X />
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedUser.isBot && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIsMemoryOpen(true)}>
+              <Brain className="size-4" aria-hidden="true" />
+              Memory
+            </button>
+          )}
+          {/* Close button */}
+          <button onClick={() => setSelectedUser(null)} aria-label="Close chat">
+            <X />
+          </button>
+        </div>
       </div>
+      {isMemoryOpen && <MemoryPanel onClose={() => setIsMemoryOpen(false)} />}
     </div>
   );
 };

@@ -75,3 +75,30 @@ test("runAgent sends the same system prompt on every step, even across a minute"
         mock.timers.reset();
     }
 });
+
+test("runAgent puts the user's memories in the system prompt and collects memory suggestions", async () => {
+    const { client, requests } = fakeClient([
+        {
+            model: "claude-opus-5-5",
+            stop_reason: "tool_use",
+            usage,
+            content: [{ type: "tool_use", id: "toolu_1", name: "save_memory", input: { text: "Prefers Python." } }],
+        },
+        { model: "claude-opus-5-5", stop_reason: "end_turn", usage, content: [{ type: "text", text: "I suggested remembering that." }] },
+    ]);
+    const shown = [];
+    const result = await runAgent([{ role: "user", content: "I prefer Python" }], {
+        userId: "u1",
+        assistantId: "bot",
+        timeZone: "UTC",
+        memories: [{ _id: "m1", text: "Name is Josh.", createdAt: new Date("2026-11-20T10:00:00Z") }],
+        events: { memory: (p) => shown.push(p) },
+        client,
+    });
+
+    assert.match(requests[0].system, /\[m1\] Name is Josh\./);
+    assert.equal(result.memoryProposals.length, 1);
+    assert.equal(result.memoryProposals[0].text, "Prefers Python.");
+    assert.deepEqual(shown, result.memoryProposals);
+    assert.equal(result.drafts.length, 0);
+});

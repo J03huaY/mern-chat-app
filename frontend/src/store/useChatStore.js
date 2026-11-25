@@ -11,8 +11,11 @@ export const useChatStore = create((set, get) => ({
     isUsersLoading: false,
     isMessagesLoading: false,
     // The AI assistant's reply while it is still streaming:
-    // { replyId, text, tools: [{ id, label, status, resultCount }] }
+    // { replyId, text, tools: [{ id, label, status, resultCount }], drafts, memories }
     aiReply: null,
+    // What the AI assistant remembers about the user (loaded by the Memory panel).
+    memories: [],
+    isMemoriesLoading: false,
 
 
     getUsers: async () => {
@@ -40,6 +43,7 @@ export const useChatStore = create((set, get) => ({
         }
     },
 
+    // Returns true when the message was sent, so the input keeps its text on failure.
     sendMessage: async (messageData) => {
         const {selectedUser, messages} = get();
         try {
@@ -47,8 +51,10 @@ export const useChatStore = create((set, get) => ({
             const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, { ...messageData, timeZone });
             set({messages:[...messages, res.data]})
+            return true;
         } catch (error) {
-            toast.error(error.response.data.message);
+            toast.error(error.response?.data?.message || "Couldn't send the message. Please try again.");
+            return false;
         }
     },
 
@@ -86,6 +92,58 @@ export const useChatStore = create((set, get) => ({
         }
     },
 
+    // Saves a memory the AI assistant suggested. Returns true on success.
+    saveMemory: async (proposalId, editedText) => {
+        try {
+            const res = await axiosInstance.post(`/memories/proposals/${proposalId}/save`,
+                editedText !== undefined ? { text: editedText } : {});
+            get().replaceMessage(res.data.assistantMessage);
+            const { memory, replacedId } = res.data;
+            set({ memories: [...get().memories.filter((m) => m._id !== replacedId), memory] });
+            toast.success("Saved to memory");
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't save the memory.");
+            if (error.response?.status === 409 && get().selectedUser) get().getMessages(get().selectedUser._id);
+            return false;
+        }
+    },
+
+    dismissMemory: async (proposalId) => {
+        try {
+            const res = await axiosInstance.post(`/memories/proposals/${proposalId}/dismiss`);
+            get().replaceMessage(res.data.assistantMessage);
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't dismiss the suggestion.");
+            if (error.response?.status === 409 && get().selectedUser) get().getMessages(get().selectedUser._id);
+            return false;
+        }
+    },
+
+    getMemories: async () => {
+        set({ isMemoriesLoading: true });
+        try {
+            const res = await axiosInstance.get("/memories");
+            set({ memories: res.data });
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't load your memories.");
+        } finally {
+            set({ isMemoriesLoading: false });
+        }
+    },
+
+    deleteMemory: async (memoryId) => {
+        try {
+            await axiosInstance.delete(`/memories/${memoryId}`);
+            set({ memories: get().memories.filter((m) => m._id !== memoryId) });
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Couldn't delete the memory.");
+            return false;
+        }
+    },
+
     subscribeToMessages: () => {
         const { selectedUser }= get();
         if(!selectedUser) return;
@@ -109,16 +167,21 @@ export const useChatStore = create((set, get) => ({
         // opened mid-reply.
         const replyFor = (replyId) => {
             const current = get().aiReply;
-            return current?.replyId === replyId ? current : { replyId, text: "", tools: [], drafts: [] };
+            return current?.replyId === replyId ? current : { replyId, text: "", tools: [], drafts: [], memories: [] };
         };
 
         socket.on("ai:start", ({ replyId }) => {
-            set({ aiReply: { replyId, text: "", tools: [], drafts: [] } });
+            set({ aiReply: { replyId, text: "", tools: [], drafts: [], memories: [] } });
         });
         // A draft the assistant just wrote (shown as a preview until the reply is saved).
         socket.on("ai:draft", ({ replyId, draft }) => {
             const reply = replyFor(replyId);
             set({ aiReply: { ...reply, drafts: [...reply.drafts, draft] } });
+        });
+        // A memory the assistant just suggested (saved only if the user presses Save).
+        socket.on("ai:memory", ({ replyId, memoryProposal }) => {
+            const reply = replyFor(replyId);
+            set({ aiReply: { ...reply, memories: [...reply.memories, memoryProposal] } });
         });
         socket.on("ai:delta", ({ replyId, text }) => {
             const reply = replyFor(replyId);
@@ -152,6 +215,7 @@ export const useChatStore = create((set, get) => ({
         socket.off("ai:reset");
         socket.off("ai:tool");
         socket.off("ai:draft");
+        socket.off("ai:memory");
         socket.off("ai:done");
         socket.off("ai:error");
         set({ aiReply: null });
